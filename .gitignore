@@ -1,0 +1,15 @@
+node_modules
+dist
+.DS_Store
+*.local
+.vite
+
+# Vendored MediaPipe artifacts — regenerate with `npm run vendor:mediapipe`
+public/mediapipe/wasm/
+public/models/*.task
+
+# Self-signed dev certs — regenerate with `npm run cert`
+certs/
+
+# Brand asset is fetched from the Brandfetch CDN, not authored here
+public/brand/

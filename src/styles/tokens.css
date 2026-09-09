@@ -1,0 +1,229 @@
+@import 'tailwindcss';
+
+/* ─────────────────────────────────────────────────────────────
+   Design tokens. Tailwind 4 is CSS-first: these become utilities
+   (bg-ground, text-accent, ease-enter, …) with no JS config file.
+   ───────────────────────────────────────────────────────────── */
+@theme {
+  /* Ground & surfaces */
+  --color-ground: #05070c;
+  --color-surface: #0b1018;
+  --color-surface-2: #111823;
+  --color-hairline: rgba(255, 255, 255, 0.08);
+  --color-hairline-strong: rgba(255, 255, 255, 0.16);
+
+  /* Brand. Taken straight from the Eventify logo. */
+  --color-brand: #105efb;
+
+  /* State palette — each state owns exactly one hue.
+
+     `accent` is the scanner's own colour and is deliberately NOT the brand
+     blue: the reticle, sweep and telemetry keep this cyan. Brand blue is for
+     branding and buttons. Keeping them separate also means the scan states
+     (cyan → amber → violet → green) stay distinguishable from chrome. */
+  --color-accent: #4fd8ff;
+  --color-accent-dim: #2a7f99;
+  --color-green: #22e07e;
+  --color-amber: #ffb84d;
+  --color-red: #ff5a5a;
+  --color-violet: #a78bfa;
+
+  /* Text */
+  --color-ink: #f2f6fb;
+  --color-ink-2: rgba(242, 246, 251, 0.66);
+  --color-ink-3: rgba(242, 246, 251, 0.38);
+
+  /* Type */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+
+  /* Motion — entrances are expo-out, cross-fades are symmetric */
+  --ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-cross: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* Instruction type scale, fluid across kiosk sizes. Sized to sit quietly
+     under the circle rather than compete with it — the circle is what the
+     attendee is looking at. */
+  --text-instruct: clamp(1.15rem, 1.9vmin + 0.55rem, 2rem);
+
+  /* Panel headline. vmin-based so a short landscape screen shrinks it rather
+     than pushing the buttons off the bottom. */
+  --text-panel: clamp(1.5rem, 3vmin + 0.5rem, 2.75rem);
+  --text-headline: clamp(2.5rem, 5vmin + 1rem, 5rem);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Kiosk chrome. An unattended touchscreen must not behave like
+   a browser: no selection, no zoom, no overscroll, no cursor,
+   no tap highlight, no context menu affordance.
+   ───────────────────────────────────────────────────────────── */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: var(--color-ground);
+}
+
+body {
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Kiosk mode hides the pointer entirely; dev keeps it. Toggled on <html>. */
+html[data-kiosk='true'],
+html[data-kiosk='true'] * {
+  cursor: none !important;
+}
+
+/* Focus is still visible for keyboard/AT users — never remove it outright. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Screen-reader-only live region */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Ambient idle motion ─────────────────────────────────────────────────
+   Long, offset loops so the Attract screen never looks frozen but also
+   never draws attention away from the call to action.
+   ──────────────────────────────────────────────────────────────────────── */
+@keyframes grid-drift {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 0 64px;
+  }
+}
+@keyframes bloom-a {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(6vmin, 4vmin, 0) scale(1.12);
+  }
+}
+@keyframes bloom-b {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1.08);
+  }
+  50% {
+    transform: translate3d(-5vmin, -6vmin, 0) scale(1);
+  }
+}
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(16, 94, 251, 0.45);
+  }
+  50% {
+    transform: scale(1.015);
+    box-shadow: 0 0 60px 6px rgba(16, 94, 251, 0.3);
+  }
+}
+
+@theme {
+  --animate-grid-drift: grid-drift 4s linear infinite;
+  --animate-bloom-a: bloom-a 22s var(--ease-cross) infinite;
+  --animate-bloom-b: bloom-b 28s var(--ease-cross) infinite;
+  --animate-breathe: breathe 3.4s var(--ease-cross) infinite;
+}
+
+/* ── Reticle motion ─────────────────────────────────────────────────────
+   The rim ticks moved to canvas: at 120 of them, driven by a travelling wave,
+   a continuous function beats 120 staggered CSS animations.
+   ──────────────────────────────────────────────────────────────────────── */
+@keyframes halo-out {
+  from {
+    transform: scale(0.92);
+    opacity: 0.85;
+  }
+  to {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+/* ── Print ───────────────────────────────────────────────────────────────
+   Only the badge prints, at CR80 stock size (54×86mm). Everything else in
+   the kiosk UI is hidden. This path exists to check the badge design against
+   real stock; production drives a native print service instead.
+   ──────────────────────────────────────────────────────────────────────── */
+@media print {
+  @page {
+    size: 54mm 86mm;
+    margin: 0;
+  }
+
+  body {
+    background: white;
+    overflow: visible;
+  }
+
+  /* Hide the whole app, then re-show just the badge, promoted to the page. */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* The on-screen badge is scaled to fit its container. A transformed ancestor
+     becomes the containing block for position:fixed, so the transform has to
+     go for printing or the card lands in the wrong place at the wrong size. */
+  .badge-fit {
+    position: static !important;
+    transform: none !important;
+  }
+
+  .badge-card,
+  .badge-card * {
+    visibility: visible !important;
+  }
+
+  .badge-card {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 54mm !important;
+    height: 86mm !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    /* Backgrounds must be forced or most browsers drop the category band. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
