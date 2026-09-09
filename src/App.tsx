@@ -2,6 +2,7 @@ import { AnimatePresence } from 'motion/react'
 import { useCallback, useState } from 'react'
 import { AttractScreen } from '@/screens/AttractScreen'
 import { ScanScreen } from '@/screens/ScanScreen'
+import { PaletteSwitcher } from '@/dev/PaletteSwitcher'
 import { FallbackPanel } from '@/ui/FallbackPanel'
 import type { FallbackKind } from '@/ui/FallbackPanel'
 import { useKioskChrome } from '@/ui/useKioskChrome'
@@ -57,6 +58,10 @@ export default function App() {
       <AnimatePresence>
         {fallback && <FallbackPanel kind={fallback} onBack={home} />}
       </AnimatePresence>
+
+      {/* App-wide so the palette can be judged on Attract as well, where the
+          brand colour actually shows. */}
+      <PaletteSwitcher />
     </div>
   )
 }

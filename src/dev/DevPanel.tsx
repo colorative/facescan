@@ -97,7 +97,7 @@ export function DevPanel(props: Props) {
         value={props.report.current?.failures.map((f) => f.key).join(',') || '—'}
       />
 
-      <Group label="tracking source">
+      <Group label="tracking source · sticky">
         <Chip active={props.useMock} onClick={() => props.onUseMock(true)}>
           mock
         </Chip>

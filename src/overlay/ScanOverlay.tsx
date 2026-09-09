@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FEATURES } from '@/config/kiosk'
-import { resolveColor } from '@/overlay/resolveColor'
+import { onColorChange, resolveColor } from '@/overlay/resolveColor'
 import { CornerBrackets } from '@/overlay/CornerBrackets'
 import { OvalRing } from '@/overlay/OvalRing'
 import { ScanCanvas } from '@/overlay/ScanCanvas'
@@ -72,9 +72,13 @@ export function ScanOverlay({
      would re-run the canvas effect on every phase change, which re-seeds the
      particles — they would jump back to the rim mid-scan. */
   const colorRef = useRef(resolveColor(color))
+  // Re-resolve on palette change too: the prop string stays
+  // 'var(--color-accent)' while what it points at has changed underneath.
+  const [themeTick, setThemeTick] = useState(0)
+  useEffect(() => onColorChange(() => setThemeTick((t) => t + 1)), [])
   useEffect(() => {
     colorRef.current = resolveColor(color)
-  }, [color])
+  }, [color, themeTick])
 
   return (
     <>

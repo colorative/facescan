@@ -126,7 +126,7 @@ html[data-kiosk='true'] * {
     background-position: 0 0;
   }
   to {
-    background-position: 0 64px;
+    background-position: 0 72px;
   }
 }
 @keyframes bloom-a {
@@ -147,15 +147,17 @@ html[data-kiosk='true'] * {
     transform: translate3d(-5vmin, -6vmin, 0) scale(1);
   }
 }
+/* Glow derived from the brand token via color-mix, not a baked rgba — a baked
+   value stays Eventify blue no matter which palette is selected. */
 @keyframes breathe {
   0%,
   100% {
     transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(16, 94, 251, 0.45);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-brand) 45%, transparent);
   }
   50% {
     transform: scale(1.015);
-    box-shadow: 0 0 60px 6px rgba(16, 94, 251, 0.3);
+    box-shadow: 0 0 60px 6px color-mix(in srgb, var(--color-brand) 30%, transparent);
   }
 }
 

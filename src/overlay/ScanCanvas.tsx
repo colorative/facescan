@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FEATURES, RETICLE, TIMING } from '@/config/kiosk'
-import { toRgbTriplet } from '@/overlay/resolveColor'
+import { lighten, mix, onColorChange, rgba, toRgb, toRgbTriplet } from '@/overlay/resolveColor'
 import { subscribeFrame } from '@/overlay/frameLoop'
 import type { Oval } from '@/overlay/OvalGeometry'
 import type { Phase } from '@/machine/scanMachine'
@@ -18,6 +18,22 @@ type Props = {
 const PARTICLE_COUNT = 46
 
 type Particle = { x: number; y: number; vx: number; vy: number; r: number; a: number }
+
+/**
+ * Canvas colours derived from the accent token, so a palette change carries
+ * through the sweep and motes and not merely the CSS-driven strokes.
+ */
+function derivePalette() {
+  const accent = toRgb('var(--color-accent)')
+  return {
+    trailFrom: rgba(accent, 0),
+    trailTo: rgba(accent, 0.16),
+    sheetEdge: rgba(lighten(accent, 0.25), 0.04),
+    sheetMid: rgba(lighten(accent, 0.45), 0.18),
+    farRim: rgba(mix(accent, [10, 14, 20], 0.25), 0.32),
+    nearRim: rgba(lighten(accent, 0.8), 0.95),
+  }
+}
 
 /**
  * Brightness bands for the rim ticks. Enough that the wave still reads as a
@@ -40,6 +56,21 @@ export function ScanCanvas({ oval, phaseRef, progressRef, meshRef, colorRef }: P
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const spritesRef = useRef<Record<DotTint, HTMLCanvasElement> | null>(null)
   const particlesRef = useRef<Particle[]>([])
+
+  /**
+   * Canvas colours derived from the accent token.
+   *
+   * Held in a ref and recomputed only when the palette changes: resolving a
+   * custom property means getComputedStyle, which is far too costly per frame.
+   * Keeping it out of the draw effect's deps also means a palette switch does
+   * not re-seed the particles mid-scan.
+   */
+  const paletteRef = useRef(derivePalette())
+  const [themeTick, setThemeTick] = useState(0)
+  useEffect(() => onColorChange(() => setThemeTick((t) => t + 1)), [])
+  useEffect(() => {
+    paletteRef.current = derivePalette()
+  }, [themeTick])
   /** Accumulated ring rotation, radians. */
   const spin = useRef(0)
   const reducedMotion = useRef(false)
@@ -69,11 +100,11 @@ export function ScanCanvas({ oval, phaseRef, progressRef, meshRef, colorRef }: P
       return c
     }
     spritesRef.current = {
-      accent: build('120,225,255'),
-      violet: build('167,139,250'),
-      green: build('34,224,126'),
+      accent: build(lighten(toRgb('var(--color-accent)'), 0.25).join(',')),
+      violet: build(toRgbTriplet('var(--color-violet)')),
+      green: build(toRgbTriplet('var(--color-green)')),
     }
-  }, [])
+  }, [themeTick])
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -303,9 +334,10 @@ export function ScanCanvas({ oval, phaseRef, progressRef, meshRef, colorRef }: P
 
           // Wake above the sheet, in the direction it came from.
           const trailH = r * 0.5
+          const pal = paletteRef.current
           const trail = ctx.createLinearGradient(0, sweepY - trailH, 0, sweepY)
-          trail.addColorStop(0, 'rgba(79,216,255,0)')
-          trail.addColorStop(1, 'rgba(79,216,255,0.14)')
+          trail.addColorStop(0, pal.trailFrom)
+          trail.addColorStop(1, pal.trailTo)
           ctx.fillStyle = trail
           ctx.fillRect(oval.cx - oval.rx, sweepY - trailH, oval.rx * 2, trailH)
 
@@ -313,9 +345,9 @@ export function ScanCanvas({ oval, phaseRef, progressRef, meshRef, colorRef }: P
 
           // The sheet itself — translucent, brightest through the middle.
           const sheet = ctx.createLinearGradient(0, sweepY - ry2, 0, sweepY + ry2)
-          sheet.addColorStop(0, 'rgba(120,225,255,0.04)')
-          sheet.addColorStop(0.5, 'rgba(170,242,255,0.17)')
-          sheet.addColorStop(1, 'rgba(120,225,255,0.04)')
+          sheet.addColorStop(0, pal.sheetEdge)
+          sheet.addColorStop(0.5, pal.sheetMid)
+          sheet.addColorStop(1, pal.sheetEdge)
           ctx.beginPath()
           ctx.ellipse(oval.cx, sweepY, halfWidth, ry2, 0, 0, Math.PI * 2)
           ctx.fillStyle = sheet
@@ -324,7 +356,7 @@ export function ScanCanvas({ oval, phaseRef, progressRef, meshRef, colorRef }: P
           // Far rim (upper half), held back.
           ctx.beginPath()
           ctx.ellipse(oval.cx, sweepY, halfWidth, ry2, 0, Math.PI, Math.PI * 2)
-          ctx.strokeStyle = 'rgba(130,205,235,0.32)'
+          ctx.strokeStyle = pal.farRim
           ctx.lineWidth = 1.4
           ctx.stroke()
 
@@ -332,7 +364,7 @@ export function ScanCanvas({ oval, phaseRef, progressRef, meshRef, colorRef }: P
           const rims: [number, string, number][] = [
             [-1.7, 'rgba(255,90,90,0.28)', 1.4],
             [1.7, 'rgba(120,180,255,0.28)', 1.4],
-            [0, 'rgba(228,250,255,0.95)', 2],
+            [0, pal.nearRim, 2],
           ]
           for (const [offset, colour, width] of rims) {
             ctx.beginPath()

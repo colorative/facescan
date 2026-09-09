@@ -7,8 +7,27 @@
 export function AmbientField() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="absolute inset-0 opacity-[0.34] [mask-image:linear-gradient(to_top,black,transparent_75%)]">
-        <div className="absolute inset-x-[-50%] bottom-[-10%] h-[70%] animate-grid-drift [background-image:linear-gradient(to_right,var(--color-brand)_1px,transparent_1px),linear-gradient(to_bottom,var(--color-brand)_1px,transparent_1px)] [background-size:64px_64px] [transform:perspective(520px)_rotateX(72deg)]" />
+      {/* The receding grid.
+
+          The flicker in the far field is aliasing: past a certain depth the
+          64px lattice projects to under a pixel of spacing, so every frame
+          resamples it slightly differently and the horizon crawls.
+
+          Moving the plane by a composited transform instead of animating
+          background-position was measurably worse (mean inter-frame delta 1.0
+          -> 2.3, directional reversals 8k -> 18k per megapixel), because the
+          compositor minifies a once-rasterized layer with no mipmaps. The
+          reliable fix is not to draw that region at all: the mask now fades
+          the grid out while its line spacing is still several pixels, and the
+          shallower tilt keeps compression gentler across what remains.
+
+          The lines are also 2px on a wider 72px lattice with a sub-pixel blur.
+          A hard 1px hairline is the thing that cannot survive minification —
+          there is no mipmapping here, so it either lands on a pixel or does
+          not. Giving it a soft profile lets minification average it instead of
+          snapping it on and off. */}
+      <div className="absolute inset-0 opacity-[0.34] [mask-image:linear-gradient(to_top,black_0%,black_14%,transparent_44%)]">
+        <div className="animate-grid-drift absolute inset-x-[-50%] bottom-[-10%] h-[70%] [background-image:linear-gradient(to_right,var(--color-brand)_0,var(--color-brand)_2px,transparent_2px),linear-gradient(to_bottom,var(--color-brand)_0,var(--color-brand)_2px,transparent_2px)] [background-size:72px_72px] [filter:blur(0.7px)] [transform:perspective(560px)_rotateX(66deg)]" />
       </div>
 
       <div className="absolute top-[-18%] left-[-10%] h-[80vmin] w-[80vmin] animate-bloom-a rounded-full bg-brand/40 blur-[90px]" />

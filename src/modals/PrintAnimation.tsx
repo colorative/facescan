@@ -12,12 +12,15 @@ const SLOT_TOP = 9
  * Slack inside the clip window for the card's own shadow.
  *
  * The window has to clip the card — that is what sells the slot — but a window
- * exactly the card's size clips its shadow too, slicing it flush at the sides
- * and bottom. These give the shadow somewhere to fall inside the clip; they
- * are wider than drop-shadow(0 14px 22px) actually reaches.
+ * sized to the card clips its shadow too, slicing it flush at the edges.
+ *
+ * Sized for the *projected* card, not the flat one: perspective magnifies the
+ * near edge, so mid-feed the card measures ~23px wider than at rest and its
+ * shadow is magnified with it. Measured slack was 26px against a 22px blur at
+ * that moment, which is precisely when the slicing showed.
  */
-const SHADOW_ROOM = 44
-const TAIL_ROOM = 72
+const SHADOW_ROOM = 72
+const TAIL_ROOM = 84
 
 const ASSEMBLY_W = BADGE_W + FASCIA_PAD * 2
 const ASSEMBLY_H = SLOT_TOP + SLOT_H + BADGE_H + TAIL_ROOM
@@ -122,24 +125,49 @@ export function PrintAnimation({
                   }
             }
           >
-            <div className="relative" style={{ filter: 'drop-shadow(0 14px 22px rgba(0,0,0,0.35))' }}>
+            {/* Shadow only once the card is at rest.
+            
+                While feeding, a filter shadow rides inside the clipped,
+                perspective-transformed element: it translates rigidly with the
+                card and its edges get sliced by the clip, which is exactly the
+                artefact that kept reappearing. A sheet emerging into air has
+                nothing beneath it to catch a shadow anyway — the aperture
+                shade below is the contact shadow, and it correctly stays put
+                at the slot instead of travelling with the paper. */}
+            <div
+              className="relative"
+              style={{
+                filter: settled ? 'drop-shadow(0 6px 18px rgba(0,0,0,0.32))' : 'none',
+                transition: 'filter 300ms ease-out',
+              }}
+            >
               <BadgeCard attendee={attendee} photo={photo} />
 
               {/* Specular sweep — a sheet of paper catches the light as it
-                  turns past the aperture. */}
+                  turns past the aperture.
+
+                  Clipped to the card's own rounded box. It travels from above
+                  the card to below it, so unclipped it slides off the bottom
+                  and blends with whatever is behind — which on the green
+                  success scrim showed up as a pale rectangle with hard side
+                  edges floating under the badge. */}
               {!reduced && !settled && (
-                <motion.div
+                <div
                   aria-hidden
-                  className="pointer-events-none absolute inset-0 rounded-3xl"
-                  style={{
-                    background:
-                      'linear-gradient(175deg, transparent 34%, rgba(255,255,255,0.4) 48%, transparent 62%)',
-                    mixBlendMode: 'overlay',
-                  }}
-                  initial={{ y: '-90%' }}
-                  animate={{ y: '95%' }}
-                  transition={{ duration: 2.2, ease: 'easeInOut' }}
-                />
+                  className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl"
+                >
+                  <motion.div
+                    className="absolute inset-0"
+                    style={{
+                      background:
+                        'linear-gradient(175deg, transparent 34%, rgba(255,255,255,0.4) 48%, transparent 62%)',
+                      mixBlendMode: 'overlay',
+                    }}
+                    initial={{ y: '-90%' }}
+                    animate={{ y: '95%' }}
+                    transition={{ duration: 2.2, ease: 'easeInOut' }}
+                  />
+                </div>
               )}
             </div>
           </motion.div>
@@ -148,13 +176,18 @@ export function PrintAnimation({
               the emerging edge stays dark as it passes through. */}
           <div
             aria-hidden
-            className="pointer-events-none absolute top-0"
+            className="pointer-events-none absolute inset-x-0 top-0"
             style={{
-              left: SHADOW_ROOM,
-              width: BADGE_W,
               height: 56,
               background:
                 'linear-gradient(to bottom, rgba(0,0,0,0.45), rgba(0,0,0,0.16) 45%, transparent)',
+              /* Faded at both ends rather than cut to the card's flat width:
+                 perspective makes the card wider mid-feed than at rest, so a
+                 hard-edged band stopped short of its edges. */
+              maskImage:
+                'linear-gradient(to right, transparent, black 14%, black 86%, transparent)',
+              WebkitMaskImage:
+                'linear-gradient(to right, transparent, black 14%, black 86%, transparent)',
             }}
           />
         </div>

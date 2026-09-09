@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { FEATURES } from '@/config/kiosk'
 import { DevPanel } from '@/dev/DevPanel'
+import { readPref, writePref } from '@/dev/devPrefs'
 import { MOCK_ATTENDEES } from '@/data/mockAttendees'
 import { isCardOpen } from '@/machine/scanMachine'
 import type { ErrorCode, Phase } from '@/machine/scanMachine'
@@ -11,6 +12,7 @@ import { printBadge } from '@/modals/printBadge'
 import type { ForcedPrint } from '@/modals/printBadge'
 import { useOval } from '@/overlay/OvalGeometry'
 import { PHASE_COLOR, ScanOverlay } from '@/overlay/ScanOverlay'
+import { toRgb } from '@/overlay/resolveColor'
 import { ErrorPanel } from '@/ui/ErrorPanel'
 import { InstructionBanner } from '@/ui/InstructionBanner'
 import { useIdleReset } from '@/ui/useIdleReset'
@@ -28,6 +30,12 @@ type Props = {
   onCancel: () => void
   onQrFallback: () => void
   onStaffHelp: () => void
+}
+
+/** The brand colour as a concrete rgba, for the pill-to-circle morph. */
+function brandFill(alpha: number): string {
+  const [r, g, b] = toRgb('var(--color-brand)')
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
 /** Faces are roughly this much wider than tall — used to size the mock mesh. */
@@ -69,7 +77,18 @@ export function ScanScreen({ onCancel, onQrFallback, onStaffHelp }: Props) {
    * kiosk that quietly fakes a scan when the camera dies would check people in
    * against synthetic data. No camera is an error panel, which is correct.
    */
-  const [useMock, setUseMock] = useState(() => devParams().mock ?? false)
+  /**
+   * Tracking source, sticky across reloads once chosen in the DevPanel.
+   *
+   * Precedence matters: an explicit review link wins, but does NOT get
+   * remembered — opening `?phase=card` to look at something should not leave
+   * the scanner in mock mode afterwards. Only the DevPanel toggle persists.
+   */
+  const [useMock, setUseMock] = useState(() => {
+    if (devParams().mock) return true
+    return readPref('useMock') === 'true'
+  })
+
   const [scenario, setScenario] = useState<MockScenario>(
     () => devParams().scenario ?? 'approach',
   )
@@ -123,6 +142,20 @@ export function ScanScreen({ onCancel, onQrFallback, onStaffHelp }: Props) {
 
   const { state, send, instruction, progressRef, metricsRef, fpsRef, reportRef } =
     useScanSession(oval, source, forced)
+
+  /**
+   * Switching source also restarts the session. Without the reset the previous
+   * source's outcome stays on screen — flip to mock while the no-camera panel
+   * is up and you keep staring at the camera error.
+   */
+  const chooseSource = useCallback(
+    (next: boolean) => {
+      setUseMock(next)
+      writePref('useMock', String(next))
+      send({ type: 'RESET' })
+    },
+    [send],
+  )
 
   const phaseRef = useRef(state.phase)
   phaseRef.current = state.phase
@@ -287,9 +320,12 @@ export function ScanScreen({ onCancel, onQrFallback, onStaffHelp }: Props) {
           borderRadius: oval.ry,
           borderColor: PHASE_COLOR[state.phase],
         }}
-        initial={{ backgroundColor: 'rgba(16, 94, 251, 1)' }}
+        /* Resolved from the token so the morph starts in whatever the brand
+           colour currently is. Motion needs a concrete colour to interpolate,
+           so a bare var() or color-mix() will not do here. */
+        initial={{ backgroundColor: brandFill(1) }}
         animate={{
-          backgroundColor: 'rgba(16, 94, 251, 0)',
+          backgroundColor: brandFill(0),
           opacity: handedOff ? 0 : 1,
         }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
@@ -359,7 +395,7 @@ export function ScanScreen({ onCancel, onQrFallback, onStaffHelp }: Props) {
           forced={forced}
           onForced={setForced}
           useMock={useMock}
-          onUseMock={setUseMock}
+          onUseMock={chooseSource}
           report={reportRef}
           forcedPrint={forcedPrint}
           onForcedPrint={setForcedPrint}

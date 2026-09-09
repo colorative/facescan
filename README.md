@@ -124,6 +124,34 @@ That is the camera path working.
 
 ## Dev panel and deep links
 
+The panel's **tracking source** and **palette** are sticky — they persist
+across reloads via `localStorage`, but only in dev builds (`src/dev/devPrefs.ts`
+is inert otherwise). A production kiosk that remembered "use the mock tracker"
+would check attendees in against synthetic data with no camera involved.
+
+Deep links imply mock tracking but are **not** persisted: opening `?phase=card`
+to look at something should not leave the scanner in mock mode afterwards.
+
+Switching source also restarts the session, so you are not left looking at the
+previous source's error panel.
+
+### Palettes
+
+`src/styles/palettes.ts` holds a handful of colour directions for the DevPanel
+switcher. Each varies only the two roles that are a design choice — `brand`
+(logo, buttons, Attract background) and `accent` (the scanner) — and leaves the
+state colours alone, because the scan reads as a sequence through amber →
+violet → green → red and those have to stay put to stay legible.
+
+Worth knowing when judging them: an accent near amber, violet or green collides
+with that state's colour, so the sequence loses contrast even though a still
+frame looks fine. `ember` and `sage` are the ones to watch.
+
+Canvas colours are derived from the accent token rather than hard-coded, so a
+palette change carries through the sweep, motes and tick wave. That is why
+`resolveColor` has an explicit cache invalidation — it memoises token lookups
+for the draw loop, and would otherwise keep painting the old theme.
+
 A **DEV** button sits top-left in dev builds. It forces any phase, any error
 panel, any mock scenario, and the match/print outcomes.
 
